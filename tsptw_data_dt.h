@@ -237,16 +237,17 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
             distWare2.push_back(static_cast<float>(matrix.time(i * (size_matrix + (CapaVec_.size()-1)*2) + j)));
           }
         } else {
-          for (int j=1; j<size_matrix-1; j++) {
+          for (int j=0; j<size_matrix-2; j++) {
             // for (const localsolver_vrp::Matrix& matrix: problem.matrices()) {
             tab.push_back(static_cast<float>(matrix.time(i * (size_matrix + (CapaVec_.size()-1)*2) + j)));
           }  
           matrice_.push_back(tab);
         }
-          // for (int i=0; i<tab.size(); i++) {
-          //   cout << tab[i] << " ";
-          // }
-          // cout << endl;
+          cout << "LA NUMERO DE LINDICE " << i << " " << endl;
+          for (int i=0; i<tab.size(); i++) {
+            cout << tab[i] << " ";
+          }
+          cout << endl;
 
       }
     }
