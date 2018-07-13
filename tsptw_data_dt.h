@@ -223,9 +223,6 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
       }
     } else {
       int size_matrix = sqrt(matrix.time().size()) - (CapaVec_.size()-1)*2;
-      cout << "ON EST LA !!" << endl;
-      cout << size_matrix << endl;
-      cout << CapaVec_.size() << endl;
       for (int i=0; i<size_matrix; i++) {
         vector<float> tab;
         if (i==size_matrix-2) {
@@ -243,11 +240,11 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
           }  
           matrice_.push_back(tab);
         }
-          cout << "LA NUMERO DE LINDICE " << i << " " << endl;
-          for (int i=0; i<tab.size(); i++) {
-            cout << tab[i] << " ";
-          }
-          cout << endl;
+          // cout << "LA NUMERO DE LINDICE " << i << " " << endl;
+          // for (int i=0; i<tab.size(); i++) {
+          //   cout << tab[i] << " ";
+          // }
+          // cout << endl;
 
       }
     }
