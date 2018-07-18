@@ -80,6 +80,10 @@ public:
 
     vector<LSExpression> endTime;
 
+    vector<LSExpression> StartDepot;
+
+    LSExpression StartDepotTotal;
+
 
     // Constructor
     Cvrptw() {
@@ -109,15 +113,24 @@ public:
             nbTrucks = data.TwStartCar().size();
             nbCustomers = size_missions;
 
+            // for (int i=0; i< demands.size(); i++) {
+            //     cout << "DEMANDE " << i  << " " << demands[i]<< endl;
+            // }
+
+            // for (int i=0; i< tw_start_car.size(); i++) {
+            //     cout << "TWSTART " << i  << " " << tw_start_car[i]<< endl;
+            // }
+
             // Declares the optimization model.
             LSModel model = localsolver.getModel();
 
             // Sequence of customers visited by each truck.
             customersSequences.resize(nbTrucks);
+            StartDepot.resize(nbTrucks);
             for (int k = 0; k < nbTrucks; k++) {
                 customersSequences[k] = model.listVar(nbCustomers);
+                StartDepot[k] = model.intVar(0,50000);
             }
-
 
             // All customers must be visited by  the trucks
             model.constraint(model.partition(customersSequences.begin(), customersSequences.end()));
@@ -127,6 +140,7 @@ public:
             LSExpression earliestArray = model.array(earliestStart.begin(), earliestStart.end());
             LSExpression latestArray = model.array(latestEnd.begin(), latestEnd.end());
             LSExpression serviceArray = model.array(serviceTime.begin(), serviceTime.end());
+            LSExpression twStartCar = model.array(tw_start_car.begin(), tw_start_car.end());
 
             // Create distance as an array to be able to acces it with an "at" operator
             LSExpression distanceArray = model.array();
@@ -143,16 +157,15 @@ public:
             vector<LSExpression> waitingTotalTruck(nbTrucks); 
             vector<LSExpression> arrivalTimeArray(nbTrucks);
 
-
             int distanceTravvelled;
             for (int k = 0; k < nbTrucks; k++) {
                 LSExpression sequence = customersSequences[k];
                 LSExpression c = model.count(sequence);
-
+                
                 // A truck is used if it visits at least one customer
                 trucksUsed[k] = c > 0;
                 maxHorizon = tw_end_car[k];
-                                
+                    
                 // The quantity needed in each route must not exceed the truck capacity
                 LSExpression demandSelector = model.createFunction([&](LSExpression i) { return demandsArray[sequence[i]]; });
                 LSExpression routeQuantity = model.sum(model.range(0, c), demandSelector);
@@ -161,46 +174,27 @@ public:
                 // Distance traveled by truck k
                 LSExpression distSelector = model.createFunction([&](LSExpression i) { return model.at(distanceArray, sequence[i - 1], sequence[i]); }); 
 
-
                 //End of each visit
                 LSExpression endSelector = model.createFunction([&](LSExpression i, LSExpression prev) {  
                  return model.max(model.at(earliestArray, sequence[i]),
                           model.iif(i == 0, 
-                                  distanceWarehousesArray[sequence[0]] + tw_start_car[k],
+                                  distanceWarehousesArray[sequence[0]] + StartDepot[k],
                                   prev + model.at(distanceArray,sequence[i-1],sequence[i]))
                                   ) + 
                           model.at(serviceArray, sequence[i]); }); 
                 
                 endTime[k] = model.array(model.range(0,c), endSelector); 
 
-
-
-                // Start of each visit if there is no timewindow
-                LSExpression startSelector = model.createFunction([&](LSExpression i, LSExpression prev) {  
-                    return  model.iif(i == 0, 
-                                  distanceWarehousesArray[sequence[0]] + tw_start_car[k],
-                                  prev + model.at(distanceArray,sequence[i-1],sequence[i])) ; });
-                
-                arrivalTimeArray[k] = model.array(model.range(0,c), startSelector); 
+                model.constraint(model.at(twStartCar, k) <= StartDepot[k]);
 
 
                 // Real start of each visit - start of each visit without timewindow -> waiting time
                 // LSExpression val;
                 LSExpression waitingTime = model.createFunction([&](LSExpression i) {
-                    return model.max(0, model.at(earliestArray, sequence[i]) - arrivalTimeArray[k][i]);
+                    return model.iif(i == 0, 
+                                model.max(0, model.at(earliestArray, sequence[i]) - distanceWarehousesArray[sequence[0]] - StartDepot[k]),
+                                model.max(0, model.at(earliestArray, sequence[i]) - endTime[k][i-1] - model.at(distanceArray,sequence[i-1],sequence[i])));
                 });
-
-                waitingArray[k] = model.array(model.range(0,c), waitingTime);
-                LSExpression totalWaitingTime = model.createFunction([&](LSExpression i) {
-                    return waitingArray[k][i];
-                });
-
-
-                // Distance done by truck k
-                routeDistances[k] = model.sum(model.range(1, c), distSelector) + //model.sum(model.range(1, c), totalWaitingTime) + 
-                    model.iif(c > 0, distanceWarehousesArray[sequence[0]] + distanceWarehousesReturnArray[sequence[c - 1]], 0);
-
-
                 
                 // Arriving home after max_horizon
                 homeLateness[k] = model.iif(trucksUsed[k], 
@@ -208,30 +202,19 @@ public:
                                 0);
 
                 // Total waiting time for truck k
-                waitingTotalTruck[k] = model.sum(model.range(0,c), totalWaitingTime);
+                waitingTotalTruck[k] = model.sum(model.range(0,c), waitingTime);
 
                 //completing visit after latest_end
-                LSExpression lateSelector = model.createFunction([&](LSExpression i) { return model.max(0,endTime[k][i] - latestArray[sequence[i]] - model.at(serviceArray, sequence[i]));});
+                LSExpression lateSelector = model.createFunction([&](LSExpression i) { return model.max(0,endTime[k][i] - model.at(latestArray, sequence[i]));});
                 lateness[k] = homeLateness[k] + model.sum(model.range(0,c),lateSelector); 
+
+                // Distance done by truck k
+                routeDistances[k] = model.sum(model.range(1, c), distSelector) + //model.sum(model.range(1, c), totalWaitingTime) + 
+                    model.iif(c > 0, distanceWarehousesArray[sequence[0]] + distanceWarehousesReturnArray[sequence[c - 1]], 0);
+
             }
 
-            // vector<bool> isIn(size_missions);
-            // int nbServiceUnaffect = 0;
-            // int penalty = 0;
-            // for (int k = 0; k < nbTrucks; k++) {
-            //     LSCollection customersCollection = customersSequences[k].getCollectionValue();
-            //     for (lsint i = 0; i < customersCollection.count(); i++) {
-            //         isIn[customersCollection[i]] = true;
-            //     }
-            // }
-            // for (int i=0; i<size_missions; i++){
-            //     if (isIn[i] == false) {
-            //         nbServiceUnaffect += 1;
-            //     }
-            // }
-            // penalty = nbServiceUnaffect * 10000;
-
-
+            StartDepotTotal = model.sum(StartDepot.begin(), StartDepot.end());
 
             // Waiting Time
             totalWaitingTime = model.sum(waitingTotalTruck.begin(), waitingTotalTruck.end());
@@ -246,21 +229,23 @@ public:
             totalDistance = (model.round(100*model.sum(routeDistances.begin(), routeDistances.end()))/100); //+ penalty;
 
             // Objective: minimize the number of trucks used, then minimize the distance travelled
+            
             model.minimize(totalLateness);
-            // model.minimize(totalWaitingTime);
             model.minimize(totalDistance);
-
-            
-
-            
-            
+            model.minimize(totalWaitingTime);
+            model.maximize(StartDepotTotal);
 
             model.close();
 
             // Parameterizes the solver.
             LSPhase phase = localsolver.createPhase();
-            phase.setTimeLimit(60);
+            phase.setTimeLimit(120);
+            // phase.setOptimizedObjective(1);
             localsolver.solve();
+
+            for (int k = 0; k < nbTrucks; k++) {
+                cout << "START " << StartDepot[k].getIntValue() << endl;
+            }
 
             cout << "TEMPS DATTENTE " << totalWaitingTime.getDoubleValue() << endl;
 
@@ -273,23 +258,10 @@ public:
                 cout << "TRUCK " << k << endl;
                 cout << "Il y a " << customersCollection.count() << " visite dans cette tournée !" << endl;
                 for (lsint i = 0; i < customersCollection.count(); i++) {
-                    cout << customersCollection[i] + 1 << " " << demands[customersCollection[i]] << " " << earliestStart[customersCollection[i]] << endl;
+                    cout << customersCollection[i] + 1 << " " << demands[customersCollection[i]] << " " << earliestStart[customersCollection[i]] << " " << latestEnd[customersCollection[i]] << endl;
                 }
                 cout << endl;
             }
-
-            // LSExpression tempsMort;
-            // for (int k=0; k<nbTrucks; k++) {
-            //     LSCollection customersCollection = customersSequences[k].getCollectionValue();
-            //     for (lsint i = 0; i < customersCollection.count(); i++) {
-            //         // if (earliestStart[customersCollection[i]] - endTime[k][i] > 0) {
-            //             tempsMort += earliestStart[customersCollection[i]] - endTime[k][i];
-            //         // }
-            //         // tempsMort += max(0, earliestStart[customersCollection[i]] - endTime[k][i]);
-            //     }
-            // }
-
-            // cout << tempsMort << endl;
 
             result.set_cost(totalDistance.getDoubleValue());
             result.clear_routes();
@@ -321,8 +293,6 @@ public:
               return -1;
             }
             output.close();
-
-            // return localsolver.getObjectiveBound(1);
     }
 
     // Writes the solution in a file with the following format :
@@ -343,7 +313,7 @@ public:
             // as in the data files (1 being the depot)
             LSCollection customersCollection = customersSequences[k].getCollectionValue();
             for (lsint i = 0; i < customersCollection.count(); i++) {
-                outfile << customersCollection[i] + 2 << " ";
+                outfile << customersCollection[i]  << " ";
             }
             outfile << endl;
         }

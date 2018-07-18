@@ -205,16 +205,16 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
       int size_matrix = sqrt(matrix.time().size());
       for (int i=0; i<size_matrix; i++) {
         vector<float> tab;
-        if (i==0) {
-          for (int j=0; j<size_matrix-1; j++) {
+        if (i==size_matrix-2) {
+          for (int j=0; j<size_matrix-2; j++) {
             distWare.push_back(static_cast<float>(matrix.time(i * (size_matrix) + j)));
           }
-        } else if (i==size_matrix-2) {
-          for (int j=0; j<size_matrix-1; j++) {
+        } else if (i==size_matrix-1) {
+          for (int j=0; j<size_matrix-2; j++) {
             distWare2.push_back(static_cast<float>(matrix.time(i * (size_matrix) + j)));
           }
         } else {
-          for (int j=1; j<size_matrix-1; j++) {
+          for (int j=0; j<size_matrix-2; j++) {
             // for (const localsolver_vrp::Matrix& matrix: problem.matrices()) {
             tab.push_back(static_cast<float>(matrix.time(i * (size_matrix) + j)));
           }  
@@ -226,11 +226,11 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
       for (int i=0; i<size_matrix; i++) {
         vector<float> tab;
         if (i==size_matrix-2) {
-          for (int j=0; j<size_matrix-1; j++) {
+          for (int j=0; j<size_matrix-2; j++) {
             distWare.push_back(static_cast<float>(matrix.time(i * (size_matrix + (CapaVec_.size()-1)*2) + j)));
           }
         } else if (i==size_matrix-1) {
-          for (int j=0; j<size_matrix-1; j++) {
+          for (int j=0; j<size_matrix-2; j++) {
             distWare2.push_back(static_cast<float>(matrix.time(i * (size_matrix + (CapaVec_.size()-1)*2) + j)));
           }
         } else {
