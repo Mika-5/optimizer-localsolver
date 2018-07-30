@@ -57,13 +57,29 @@ public:
     return distWare2;
   }
 
-  vector<int> TimeWindowStarts() const {
-    return timewindow_start_ ;
+  vector<int> TimeWindowStarts1() const {
+    return timewindow_start_1 ;
   }
 
-  vector<int> TimeWindowEnds() const {
-    return timewindow_end_ ;
+  vector<int> TimeWindowEnds1() const {
+    return timewindow_end_1 ;
   }
+
+  vector<int> TimeWindowStarts2() const {
+    return timewindow_start_2 ;
+  }
+
+  vector<int> TimeWindowEnds2() const {
+    return timewindow_end_2 ;
+  }
+
+  // vector<vector<int>> TimeWindowStarts() const {
+  //   return timewindow_start_ ;
+  // }
+
+  // vector<vector<int>> TimeWindowEnds() const {
+  //   return timewindow_end_ ;
+  // }
 
   vector<vector<int>> IndiceMultipleTW() const {
     return indiceMultipleTW_;
@@ -101,8 +117,12 @@ private:
   vector<int> Durations_;
   vector<int> tw_start_car_;
   vector<int> tw_end_car_;
-  vector<int> timewindow_start_;
-  vector<int> timewindow_end_;
+  // vector<vector<int>> timewindow_start_;
+  // vector<vector<int>> timewindow_end_;
+  vector<int> timewindow_start_1;
+  vector<int> timewindow_end_1;
+  vector<int> timewindow_start_2;
+  vector<int> timewindow_end_2;
   vector<int> start_index_;
   vector<int> end_index_;
   vector<vector<float>> matrice_;
@@ -145,47 +165,69 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
   vector<int> end;
   for (const localsolver_vrp::Service& service: problem.services()) {
     j+=1;
-    // if (service.Durations() != 0) {
     Durations_.push_back(service.duration());
-    // }
     for (const float& quantity: service.quantities()) {
       Demands_.push_back(quantity);
     }
 
-    // if (service.time_windows().size()!=1 && service.time_windows().size()!=0) {
-    //   for (const int& quantity: service.quantities()) {
-    //     Demands_.push_back(quantity/1000);
-    //   }
-    //   Durations_.push_back(service.Durations());
-    //   size_missions_multipleTW_+=1;
-    //   for (int i=0; i<service.time_windows().size(); i++) {
-    //     indice_.push_back(i+j+1);
-    //   }
-    //   indiceMultipleTW_.push_back(indice_);
-    //   indice_.clear();
-    // }
-
-    if (service.time_windows().size() != 0){
+    if (service.time_windows().size() != 0 && service.time_windows().size() != 1){
       for (const localsolver_vrp::TimeWindow& tw: service.time_windows()) {
-    //   start.push_back(tw.start());
-    //   end.push_back(tw.end());
-    // }
-
-        timewindow_start_.push_back(tw.start());
+        start.push_back(tw.start());
         if (tw.end() == 0) {
-          timewindow_end_.push_back(5000000);  
+          end.push_back(5000000);  
         } else {
-          timewindow_end_.push_back(tw.end());
+          end.push_back(tw.end());
         }
-      
       }
-    // start.clear();
-    // end.clear();
-    } else {
-      timewindow_start_.push_back(0);
-      timewindow_end_.push_back(5000000);
+
+      timewindow_start_1.push_back(start[0]);
+      timewindow_end_1.push_back(end[0]);
+      timewindow_start_2.push_back(start[1]);
+      timewindow_end_2.push_back(end[1]);
+
+      
+      // }
+      start.clear();
+      end.clear();
+
+    } else if (service.time_windows().size() == 1) {
+      for (const localsolver_vrp::TimeWindow& tw: service.time_windows()) {
+        start.push_back(tw.start());
+        if (tw.end() == 0) {
+          end.push_back(5000000);  
+        } else {
+          end.push_back(tw.end());
+        }
+      }
+      start.push_back(-2);
+      end.push_back(-1);
+      timewindow_start_1.push_back(start[0]);
+      timewindow_end_1.push_back(end[0]);
+      timewindow_start_2.push_back(start[1]);
+      timewindow_end_2.push_back(end[1]);
+      start.clear();
+      end.clear();
+    }
+    else {
+      for (int i=0; i<2; i++) {
+        if (i == 0) {
+          start.push_back(0);
+          end.push_back(5000000);
+        } else {
+          start.push_back(-2);
+          end.push_back(-1);
+        }
+        
+      }
+      timewindow_start_1.push_back(start[0]);
+      timewindow_end_1.push_back(end[0]);
+      timewindow_start_2.push_back(start[1]);
+      timewindow_end_2.push_back(end[1]);
+      start.clear();
+      end.clear();
     }
   }
+
 
   for (const localsolver_vrp::Vehicle& vehicle: problem.vehicles()) {
     for (const localsolver_vrp::Capacity& capacity: vehicle.capacities()) {
@@ -201,7 +243,6 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
   for (const localsolver_vrp::Matrix& matrix: problem.matrices()) {
     int size_matrix5 = sqrt(matrix.time().size());
     if (size_matrix5 == size_missions_ + 2) {
-      cout << "ON EST PAS LA !" << endl;
       int size_matrix = sqrt(matrix.time().size());
       for (int i=0; i<size_matrix; i++) {
         vector<float> tab;
@@ -215,7 +256,6 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
           }
         } else {
           for (int j=0; j<size_matrix-2; j++) {
-            // for (const localsolver_vrp::Matrix& matrix: problem.matrices()) {
             tab.push_back(static_cast<float>(matrix.time(i * (size_matrix) + j)));
           }  
           matrice_.push_back(tab);
@@ -235,17 +275,10 @@ void TSPTWDataDT::LoadInstance(const string & filename) {
           }
         } else {
           for (int j=0; j<size_matrix-2; j++) {
-            // for (const localsolver_vrp::Matrix& matrix: problem.matrices()) {
             tab.push_back(static_cast<float>(matrix.time(i * (size_matrix + (CapaVec_.size()-1)*2) + j)));
           }  
           matrice_.push_back(tab);
         }
-          // cout << "LA NUMERO DE LINDICE " << i << " " << endl;
-          // for (int i=0; i<tab.size(); i++) {
-          //   cout << tab[i] << " ";
-          // }
-          // cout << endl;
-
       }
     }
   }
